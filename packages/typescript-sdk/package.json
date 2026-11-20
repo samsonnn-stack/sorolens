@@ -19,7 +19,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "node init && node scripts/build.mjs",
     "test": "npm run build && node --test test/*.test.mjs",
     "size": "node scripts/size.mjs"
   },
