@@ -1,6 +1,4 @@
 # Environment
-.env
-.env.local
 .env.*.local
 
 # Node
@@ -28,7 +26,6 @@ sorolens-bin
 
 # Misc
 .DS_Store
-.env
 
 # Python
 __pycache__/
@@ -39,3 +36,4 @@ __pycache__/
 # Docs site (mkdocs.yml)
 /site/
 /.venv-docs/
+config.bat
