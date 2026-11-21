@@ -23,6 +23,8 @@ there, not here.
 | `COLD_STORAGE_SECRET_ACCESS_KEY` | — | no | Explicit credentials. Leave both empty to use the default AWS credential chain (environment, shared config, IAM role). |
 | `COLD_STORAGE_THRESHOLD_DAYS` | `90` | no | Events older than this many days are exported to Parquet and deleted from Postgres by the nightly archive job. |
 | `CORS_ALLOWED_ORIGINS` | — | no | corsMiddleware returns an http.Handler middleware that sets CORS headers. When CORS_ALLOWED_ORIGINS is unset or contains "*" all origins are allowed (Access-Control-Allow-Origin: *). When it is a comma-separated list of origins, only requests whose Origin header is in the list receive an echoed origin back; all others receive the first entry in the list (the browser will still block the mismatch). This lets a self-hosted API restrict cross-origin access to the Vercel dashboard domain without any code change. |
+| `DATABASE_READ_URL` | — | no | DatabaseReadURL is the optional Postgres replica connection string. |
+| `DATABASE_REPLICA_LAG_THRESHOLD` | `10s` | no | DATABASE_REPLICA_LAG_THRESHOLD is the maximum replication lag permitted before queries fall back to the primary database. |
 | `DATABASE_URL` | — | yes | DatabaseURL is the pooled Postgres connection string used by the API. |
 | `DB_MAX_CONNS` | `DefaultDBMaxConns` | no | API pgx pool limits and connection recycling. These defaults are suitable for a small deployment; set them lower or higher to match the Postgres capacity. |
 | `DB_MAX_CONN_IDLE_TIME` | `DefaultDBMaxConnIdleTime` | no | API pgx pool limits and connection recycling. These defaults are suitable for a small deployment; set them lower or higher to match the Postgres capacity. |
@@ -43,6 +45,8 @@ there, not here.
 | `METRICS_PORT` | — | no | MetricsPort, when non-empty, starts a second HTTP listener that serves only GET /metrics. It lets operators scrape metrics on a private interface instead of exposing the endpoint on the public API port. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | no | OTEL_EXPORTER_OTLP_ENDPOINT is the OTLP/gRPC collector (host:port) that receives traces. Empty disables trace export. |
 | `PORT` | `8080` | no | Port is the HTTP port the API listens on. |
+| `RATE_LIMIT_PER_MINUTE` | `60` | no | RateLimitPerMinute is the default anonymous request budget. |
+| `RATE_LIMIT_WINDOW` | `time.Minute` | no | RateLimitWindow is the sliding window used by the rate limiter. |
 | `REDIS_URL` | — | yes | RedisURL is the Redis connection string used for caching and advisory locks. |
 | `REPORT_SIGNING_KEY` | — | no | ReportSigningKey signs exported SLA reports (issue #266). When empty the reporting handlers fall back to REPORT_SIGNING_KEY; with neither set the reports are emitted unsigned and every response says so. |
 | `REQUEST_MAX_BODY_BYTES` | `strconv.FormatInt(DefaultRequestMaxBodyBytes, 10)` | no | MaxBodyBytesFromEnv resolves the request body size limit from REQUEST_MAX_BODY_BYTES, falling back to DefaultRequestMaxBodyBytes when the variable is unset. The value must be a positive integer: a non-numeric or non-positive value is rejected so a bad deployment fails fast instead of silently disabling the guard. |
@@ -59,6 +63,7 @@ there, not here.
 | `TELEGRAM_BOT_TOKEN` | — | no | Telegram bot token from @BotFather, used to send test messages and watchdog alerts. |
 | `TELEGRAM_CHAT_ID` | — | no | Telegram chat id the bot posts test messages and watchdog alerts to. |
 | `TRUSTED_IDENTITY_PROXY_SECRET` | — | no | TrustedProxySecret enables identity headers signed by a reverse proxy. Empty disables that identity source. |
+| `TRUSTED_PROXIES` | — | no | TrustedProxies lists proxy peers allowed to supply X-Forwarded-For. |
 | `VERIFY_BUILD_COMMAND` | `stellar contract build` | no | VerifyBuildCommand is the deterministic build invocation used for contract source verification (issue #263), parsed from a space-separated string. It is executed directly, never through a shell. |
 | `VERIFY_TIMEOUT` | `10m` | no | VERIFY_TIMEOUT bounds a single contract verification build (Go duration). |
 | `VERIFY_WORKSPACE_DIR` | — | no | VerifyWorkspaceDir is the parent directory for verification workspaces. Empty means the OS temporary directory. |
@@ -80,7 +85,7 @@ there, not here.
 | `INDEXER_CONCURRENCY` | `envInt("INDEXER_WORKERS", runtime.GOMAXPROCS(0))` | no | INDEXER_CONCURRENCY (or the older INDEXER_WORKERS) is how many contracts one pass indexes concurrently; defaults to the number of usable CPUs. |
 | `INDEXER_FN_CALL_FALLBACK` | `true` | no | On by default; set INDEXER_FN_CALL_FALLBACK=false to only trust diagnostic events for function names (issue #504). |
 | `INDEXER_HEARTBEAT_INTERVAL` | `coordinator.DefaultHeartbeatInterval` | no | HeartbeatInterval is how often a worker reports liveness. |
-| `INDEXER_METRICS_ADDR` | `:9100` | no | Address for the Prometheus /metrics HTTP server (empty disables it) |
+| `INDEXER_METRICS_ADDR` | `:9100` | no | Address for the Prometheus /metrics, /healthz and /readyz HTTP server (empty disables it) |
 | `INDEXER_REBALANCE_INTERVAL` | `coordinator.DefaultRebalanceInterval` | no | RebalanceInterval is how often the leader reconciles ownership. |
 | `INDEXER_ROLE` | `all` | no | Sharded topology (issue #272). The default role preserves the original single-process behaviour: index every contract in this process. |
 | `INDEXER_SHARD_COUNT` | `coordinator.DefaultShardCount` | no | Number of shards contracts are spread across |
@@ -89,6 +94,7 @@ there, not here.
 | `INDEXER_WORKER_ID` | — | no | Unique id for this process (required for coordinator and worker roles) |
 | `INDEXER_WORKER_STALE_AFTER` | `coordinator.DefaultStaleAfter` | no | StaleAfter is how long a worker may go unheard before its shards move. |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | — | no | OTEL_EXPORTER_OTLP_ENDPOINT is the OTLP/gRPC collector (host:port) that receives traces. Empty disables trace export. |
+| `REDIS_URL` | `redis://localhost:6379` | no | Redis URL for the run lock (empty disables locking, falls back to stub) |
 | `SENTRY_DSN` | — | no | Error reporting is disabled entirely when SENTRY_DSN is unset: sentry-go falls back to a no-op transport, so reportPanic below still runs safely but delivers nothing. |
 | `SENTRY_ENVIRONMENT` | `production` | no | Tags reported Sentry events with the deployment environment. |
 | `SOROBAN_NETWORK` | — | no | SOROBAN_NETWORK is the network the call-graph backfill stamps on the rows it writes (testnet, mainnet or futurenet); defaults to testnet. |
@@ -166,7 +172,7 @@ there, not here.
 | `STELLAR_NETWORK` | `testnet` | no | Stellar network identifier. Controls which network passphrase the app uses. Valid values: testnet \| mainnet \| futurenet |
 | `VAPID_PRIVATE_KEY` | — | no | VAPID keys for Web Push notifications.  Server-side only; never prefix with NEXT_PUBLIC_.  Generate once with: node -e "const wp=require('web-push'); console.log(wp.generateVAPIDKeys())" or: npx web-push generate-vapid-keys |
 | `VAPID_PUBLIC_KEY` | — | no | VAPID keys for Web Push notifications.  Server-side only; never prefix with NEXT_PUBLIC_.  Generate once with: node -e "const wp=require('web-push'); console.log(wp.generateVAPIDKeys())" or: npx web-push generate-vapid-keys |
-| `VAPID_SUBJECT` | `mailto:admin@sorolens.dev` | no | VAPID keys for Web Push notifications.  Server-side only; never prefix with NEXT_PUBLIC_.  Generate once with: node -e "const wp=require('web-push'); console.log(wp.generateVAPIDKeys())" or: npx web-push generate-vapid-keys A mailto: or https: URI for the VAPID JWT "sub" field. |
+| `VAPID_SUBJECT` | `mailto:admin@sorolens.xyz` | no | VAPID keys for Web Push notifications.  Server-side only; never prefix with NEXT_PUBLIC_.  Generate once with: node -e "const wp=require('web-push'); console.log(wp.generateVAPIDKeys())" or: npx web-push generate-vapid-keys A mailto: or https: URI for the VAPID JWT "sub" field. |
 | `WATCHDOG_CONTRACT_ID` | `CACXRL67WL5KRD6HKWGYADHEUF6RQOCODUN26UQE7MGFZEMIR7PAX6R7` | no | Deployed sorolens-watchdog Soroban contract id (56-char, starts with C). After running contracts/watchdog/scripts/deploy-testnet.sh, take the id it prints and set it here so the indexer knows which contract's events to treat as watchdog telemetry rather than generic contract events. |
 
 ## Web dashboard (`apps/web`)
@@ -178,20 +184,23 @@ there, not here.
 | `CSP_REPORT_ONLY` | `false (policy enforced)` | no | Set to "true" to send the Content-Security-Policy in report-only mode, which reports violations to /api/csp-report without blocking anything. Use it to stage a policy change before enforcing it. Exposed to browser: No (server-only) |
 | `INDEXER_METRICS_URL` | `http://localhost:9100/metrics` | no | Prometheus /metrics endpoint of the indexer service. Scraped server-side by the /api/status/indexer route handler to display sync lag and ledger progress. Exposed to browser: No (server-only) |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8080` | no | Public base URL of the SoroLens REST API backend. Exposed to browser: Yes (NEXT_PUBLIC_*) |
-| `NEXT_PUBLIC_APP_URL` | `https://sorolens.dev` | no | Canonical public origin of the web application. The single source for every absolute URL the dashboard publishes: metadataBase (social cards and absolute metadata URLs), robots.txt (host and sitemap URL) and sitemap.xml entries. Read by lib/siteUrl.ts; a trailing slash is stripped. Exposed to browser: Yes (NEXT_PUBLIC_*) |
+| `NEXT_PUBLIC_APP_URL` | `https://sorolens.xyz` | no | Canonical public origin of the web application. The single source for every absolute URL the dashboard publishes: metadataBase (social cards and absolute metadata URLs), robots.txt (host and sitemap URL) and sitemap.xml entries. Read by lib/siteUrl.ts; a trailing slash is stripped. Exposed to browser: Yes (NEXT_PUBLIC_*) |
 | `NEXT_PUBLIC_INDEXER_METRICS_URL` | `http://localhost:9100/metrics` | no | Public fallback alias for the indexer Prometheus /metrics endpoint. Used by /api/status/indexer if INDEXER_METRICS_URL is unset. Exposed to browser: Yes (NEXT_PUBLIC_*) |
-| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | `none (analytics disabled)` | no | Domain name for privacy-preserving Plausible Analytics (e.g. sorolens.dev). Injected via a lightweight script only in production builds (NODE_ENV=production). Leave unset or empty to disable analytics. Exposed to browser: Yes (NEXT_PUBLIC_*) Example: sorolens.dev |
+| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | `none (analytics disabled)` | no | Domain name for privacy-preserving Plausible Analytics (e.g. sorolens.xyz). Injected via a lightweight script only in production builds (NODE_ENV=production). Leave unset or empty to disable analytics. Exposed to browser: Yes (NEXT_PUBLIC_*) Example: sorolens.xyz |
 | `NEXT_PUBLIC_PWA_ENABLED` | `false` | no | Enables Progressive Web App (PWA) service worker generation and registration in development mode when set to "true". In production (NODE_ENV=production), the service worker is always enabled unless explicitly disabled. Exposed to browser: Yes (NEXT_PUBLIC_*) |
 | `NEXT_PUBLIC_SENTRY_DSN` | `none (reporting disabled)` | no | Sentry DSN for client-side frontend error reporting and performance tracing. Leave unset or empty to completely disable Sentry error reporting. Exposed to browser: Yes (NEXT_PUBLIC_*) Example: https://examplePublicKey@o0.ingest.sentry.io/0 |
 | `PUSH_INTERNAL_SECRET` | `none (unauthenticated in development)` | no | Shared secret token guarding the internal PUT /api/push/subscribe endpoint (checked against the x-push-secret request header) for dispatching alerts. SERVER-ONLY SECRET: Must NEVER be committed to version control or exposed publicly. Set to a long random secret before enabling push notifications in production. Exposed to browser: No (server-only secret) Example: replace_with_a_secure_random_internal_secret |
 | `VAPID_PRIVATE_KEY` | `none` | no | Base64url-encoded 32-byte EC P-256 private key for Web Push. Used on the server to sign Web Push payloads. SERVER-ONLY SECRET: Must NEVER be committed to version control or exposed publicly. Exposed to browser: No (server-only secret) Generate a keypair with: npx web-push generate-vapid-keys Example: fake_vapid_private_key_do_not_use_in_prod |
 | `VAPID_PUBLIC_KEY` | `none` | no | Base64url-encoded 65-byte uncompressed EC P-256 public key for Web Push. Shared with browser clients via /api/push/key to subscribe to notifications. Exposed to browser: Yes (via /api/push/key API endpoint) Generate a keypair with: npx web-push generate-vapid-keys Example: BEl62iUYgUivxIkv69yViEuiBIa-Ib9-Skv6_example_public_key_only |
-| `VAPID_SUBJECT` | `mailto:admin@sorolens.dev` | no | Contact URI (mailto: or https:) for the VAPID JWT 'sub' claim. Allows push services to contact the application operator. Exposed to browser: No (server-only) |
+| `VAPID_SUBJECT` | `mailto:admin@sorolens.xyz` | no | Contact URI (mailto: or https:) for the VAPID JWT 'sub' claim. Allows push services to contact the application operator. Exposed to browser: No (server-only) |
 
 ## Discord bot (`services/discord-bot`)
 
 | Name | Default | Required | Description |
 |---|---|---|---|
+| `ALERT_POLL_INTERVAL_SECONDS` | `0` | no | Optional polling interval in seconds for watchdog alerts. Set > 0 to enable periodic polling of the Sorolens API for active subscribed contracts. |
+| `ALERT_RATE_LIMIT_PER_MINUTE` | `5` | no | Rate limit for outgoing alert messages per channel per minute (default 5). |
+| `ALERT_WEBHOOK_SECRET` | — | yes | Required for webhook ingestion at /webhook/alerts and /alerts (fails closed). The bot requires this secret (whsec_...) to verify HMAC-SHA256 signatures before routing any alert. If left blank, webhook routes reject all alert requests (503). |
 | `COMMAND_RATE_LIMIT_PER_MINUTE` | `10` | no | Per-user slash command budget, sliding 60s window. Default 10. |
 | `CONTRIBUTOR_THRESHOLD` | `1` | no | Contributors need at least this many merged PRs against GITHUB_REPO. |
 | `CORE_CONTRIBUTOR_THRESHOLD` | `3` | no | Contributors need at least this many merged PRs against GITHUB_REPO. |

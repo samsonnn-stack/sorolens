@@ -43,18 +43,22 @@ type MockStore struct {
 	contractTags          map[string]map[string]bool
 	wasmBinaries          map[string]ContractWasm
 	contractSpecs         map[string]ContractSpec
+	contractEventSchemas  map[string]map[string]ContractEventSchema
 	contractVerifications map[string]ContractVerification
 	alertRules            []AlertRule
 	contractNotes         map[string][]ContractNote
 	watchedAccounts       map[string]WatchedAccount
+	*MockExportJobStore
 
 	// auditMu guards auditEvents: the audit middleware writes asynchronously.
-	auditMu     sync.Mutex
-	auditEvents []AuditEvent
+	auditMu      sync.Mutex
+	auditEvents  []AuditEvent
+	usageRecords []APIKeyUsageRecord
 
 	// Error injection
 	UpsertContractErr                 error
 	GetContractErr                    error
+	UntrackContractErr                error
 	ListContractsErr                  error
 	DeleteContractsErr                error
 	SetContractLabelErr               error
@@ -167,6 +171,7 @@ func NewMockStore() *MockStore {
 		failedEvents:          make(map[int64]FailedEvent),
 		labels:                make([]Label, 0),
 		watchedAccounts:       make(map[string]WatchedAccount),
+		MockExportJobStore:    NewMockExportJobStore(),
 	}
 }
 
@@ -193,6 +198,19 @@ func (m *MockStore) GetContract(_ context.Context, contractID string) (Contract,
 	}
 	c.Tags = m.tagsFor(contractID)
 	return c, nil
+}
+
+func (m *MockStore) UntrackContract(_ context.Context, contractID string) error {
+	if m.UntrackContractErr != nil {
+		return m.UntrackContractErr
+	}
+	c, ok := m.contracts[contractID]
+	if !ok {
+		return ErrNotFound
+	}
+	c.Status = "paused"
+	m.contracts[contractID] = c
+	return nil
 }
 
 func (m *MockStore) ListContracts(_ context.Context, cursor string, limit int, f ContractFilters) ([]Contract, string, error) {

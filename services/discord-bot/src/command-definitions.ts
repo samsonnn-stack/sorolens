@@ -6,7 +6,7 @@
  * `DISCORD_BOT_TOKEN`, `DISCORD_CLIENT_ID`, and `DISCORD_GUILD_ID` set.
  */
 
-import { ChannelType, SlashCommandBuilder } from "discord.js";
+import { ChannelType, PermissionFlagsBits, SlashCommandBuilder } from "discord.js";
 
 export const commandDefinitions = [
   new SlashCommandBuilder()
@@ -246,14 +246,13 @@ export const commandDefinitions = [
   new SlashCommandBuilder()
     .setName("assign-release")
     .setDescription(
-      "(Admin) Stop counting an issue toward someone's max (does not unassign on GitHub)"
+      "(Admin) Free issues the bot gave out (does not unassign on GitHub)"
     )
     .setDefaultMemberPermissions("0")
-    .addIntegerOption((o) =>
+    .addStringOption((o) =>
       o
-        .setName("issue")
-        .setDescription("Issue number")
-        .setMinValue(1)
+        .setName("issues")
+        .setDescription("Issue numbers, e.g. 567, 647, 767 or 800-810")
         .setRequired(true)
     ),
   new SlashCommandBuilder()
@@ -353,4 +352,66 @@ export const commandDefinitions = [
         )
     )
     .addSubcommand((s) => s.setName("list").setDescription("Show milestones")),
+  new SlashCommandBuilder()
+    .setName("subscribe")
+    .setDescription("Subscribe a channel to contract watchdog alerts")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels.toString())
+    .addStringOption((o) =>
+      o
+        .setName("contract")
+        .setDescription("Stellar contract id (56 characters, starts with C)")
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(64)
+        .setAutocomplete(true)
+    )
+    .addStringOption((o) =>
+      o
+        .setName("severity")
+        .setDescription("Minimum alert severity to receive (default: all)")
+        .setRequired(false)
+        .addChoices(
+          { name: "All (Info, Warning, Critical)", value: "all" },
+          { name: "Critical only", value: "critical" },
+          { name: "Warning and Critical", value: "warning" },
+          { name: "Info only", value: "info" }
+        )
+    )
+    .addChannelOption((o) =>
+      o
+        .setName("channel")
+        .setDescription("Channel to subscribe (defaults to this channel)")
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("unsubscribe")
+    .setDescription("Unsubscribe a channel from contract watchdog alerts")
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageChannels.toString())
+    .addStringOption((o) =>
+      o
+        .setName("contract")
+        .setDescription("Stellar contract id (56 characters, starts with C)")
+        .setRequired(true)
+        .setMinLength(1)
+        .setMaxLength(64)
+        .setAutocomplete(true)
+    )
+    .addChannelOption((o) =>
+      o
+        .setName("channel")
+        .setDescription("Channel to unsubscribe (defaults to this channel)")
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        .setRequired(false)
+    ),
+  new SlashCommandBuilder()
+    .setName("subscriptions")
+    .setDescription("List active contract alert subscriptions for a channel")
+    .addChannelOption((o) =>
+      o
+        .setName("channel")
+        .setDescription("Channel to inspect (defaults to this channel)")
+        .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+        .setRequired(false)
+    ),
 ].map((c) => c.toJSON());
